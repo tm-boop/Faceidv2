@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Recognition System</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #202124; color: white; padding: 20px; }
+        #webcam-container { margin: 20px; border: 4px solid #4285f4; border-radius: 10px; overflow: hidden; }
+        #label-container div { background: #3c4043; margin: 5px; padding: 10px; border-radius: 5px; width: 300px; display: flex; justify-content: space-between; }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div>Система розпізнавання (3 сек + 90%)</div>
+<button type="button" onclick="init()">Start</button>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+<script type="text/javascript">
+    const URL = "./"; // Шлях до файлів у вашому репозиторії
+
+    let model, webcam, labelContainer, maxPredictions;
+    
+    // Об'єкт для відстеження часу детекції кожного класу
+    let detectionTrackers = {};
+
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        const flip = true;
+        webcam = new tmImage.Webcam(400, 400, flip);
+        await webcam.setup();
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        
+        for (let i = 0; i < maxPredictions; i++) {
+            labelContainer.appendChild(document.createElement("div"));
+            
+            // Створюємо трекер для кожного класу (наприклад: Марко, Олена, Повітря)
+            detectionTrackers[i] = {
+                startTime: null,
+                isAnnounced: false
+            };
+        }
+    }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        const currentTime = Date.now();
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const className = prediction[i].className;
+            const probability = prediction[i].probability;
+
+            // Оновлюємо текст на екрані
+            labelContainer.childNodes[i].innerHTML = `<span>${className}</span> <span>${(probability * 100).toFixed(0)}%</span>`;
+
+            // ЛОГІКА: більше 90% (0.90)
+            if (probability > 0.90) {
+                // Якщо детекція щойно почалася — фіксуємо час
+                if (!detectionTrackers[i].startTime) {
+                    detectionTrackers[i].startTime = currentTime;
+                } 
+                
+                // Перевіряємо, чи пройшло 3000 мс (3 секунди)
+                const duration = currentTime - detectionTrackers[i].startTime;
+                
+                if (duration > 3000 && !detectionTrackers[i].isAnnounced) {
+                    announceClass(className);
+                    detectionTrackers[i].isAnnounced = true; // Щоб не "кричало" щосекунди
+                }
+            } else {
+                // Якщо впевненість впала нижче 90% — скидаємо таймер
+                detectionTrackers[i].startTime = null;
+                detectionTrackers[i].isAnnounced = false;
+            }
+        }
+    }
+
+    // Функція голосового оголошення
+    function announceClass(name) {
+        // Пропускаємо оголошення, якщо це клас "Повітря" (опціонально)
+        if (name.toLowerCase() === "повітря") return;
+
+        const utterance = new SpeechSynthesisUtterance(name);
+        utterance.lang = 'uk-UA'; // Українська мова
+        window.speechSynthesis.speak(utterance);
+    }
+</script>
+
+</body>
+</html>
