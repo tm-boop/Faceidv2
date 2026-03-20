@@ -219,7 +219,7 @@
 
         function announceClass(name) {
             if (name.toLowerCase().includes("повітря")) return;
-            const utterance = new SpeechSynthesisUtterance(`Впізнано: ${name}`);
+            const utterance = new SpeechSynthesisUtterance(`Indificated: ${name}`);
             utterance.lang = 'uk-UA';
             utterance.rate = 0.9; // Трохи повільніша, чітка дикція
             window.speechSynthesis.speak(utterance);
