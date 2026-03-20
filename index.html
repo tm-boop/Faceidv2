@@ -144,3 +144,76 @@
             labelContainer = document.getElementById("label-container");
             
             for (let i = 0; i < maxPredictions; i++) {
+                const className = model.getClassLabels()[i].toLowerCase();
+                
+                // 2. Клас повітря та спейс робимо прихованими (не додаємо в список)
+                if (className.includes("повітря") || className.includes("space")) {
+                    detectionTrackers[i] = { startTime: null, isAnnounced: false, hidden: true };
+                    continue; 
+                }
+
+                const labelBox = document.createElement("div");
+                labelBox.className = "label-box";
+                labelBox.id = "box-" + i;
+                labelContainer.appendChild(labelBox);
+                detectionTrackers[i] = { startTime: null, isAnnounced: false, hidden: false };
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            const currentTime = Date.now();
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const className = prediction[i].className;
+                const probability = prediction[i].probability;
+                const tracker = detectionTrackers[i];
+
+                // Оновлюємо тільки видимі класи
+                if (!tracker.hidden) {
+                    const labelBox = document.getElementById("box-" + i);
+                    labelBox.innerHTML = `
+                        <span class="class-name">${className}</span>
+                        <span class="probability">${(probability * 100).toFixed(0)}%</span>
+                    `;
+
+                    if (probability > 0.90) {
+                        labelBox.classList.add('active');
+                    } else {
+                        labelBox.classList.remove('active');
+                    }
+                }
+
+                // Логіка озвучки (1. Прибрано спейс і повітря)
+                if (probability > 0.90) {
+                    if (!tracker.startTime) tracker.startTime = currentTime;
+                    
+                    if (currentTime - tracker.startTime > 3000 && !tracker.isAnnounced) {
+                        // Озвучуємо ТІЛЬКИ якщо це не повітря і не спейс
+                        const lowerName = className.toLowerCase();
+                        if (!lowerName.includes("повітря") && !lowerName.includes("space")) {
+                            announceClass(className);
+                            tracker.isAnnounced = true;
+                        }
+                    }
+                } else {
+                    tracker.startTime = null;
+                    tracker.isAnnounced = false;
+                }
+            }
+        }
+
+        function announceClass(name) {
+            const utterance = new SpeechSynthesisUtterance(`indificated: ${name}`);
+            utterance.lang = 'uk-UA';
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
