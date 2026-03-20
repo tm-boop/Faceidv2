@@ -2,108 +2,228 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>AI Recognition System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Recognition System - LUTSK</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #202124; color: white; padding: 20px; }
-        #webcam-container { margin: 20px; border: 4px solid #4285f4; border-radius: 10px; overflow: hidden; }
-        #label-container div { background: #3c4043; margin: 5px; padding: 10px; border-radius: 5px; width: 300px; display: flex; justify-content: space-between; }
-        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 5px; }
+        :root {
+            --primary: #38bdf8;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 40px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        #univ-logo {
+            width: 80px;
+            height: auto;
+            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.3));
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin: 0;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #start-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #start-btn {
+            padding: 16px 40px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--bg);
+            background: var(--primary);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.4);
+        }
+
+        #start-btn:hover {
+            transform: translateY(-2px);
+            background: #7dd3fc;
+            box-shadow: 0 20px 25px -5px rgba(56, 189, 248, 0.5);
+        }
+
+        #webcam-container {
+            position: relative;
+            border: 3px solid var(--card);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            background: #000;
+            line-height: 0;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        #label-container {
+            margin-top: 30px;
+            display: grid;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .label-box {
+            background: var(--card);
+            padding: 16px 20px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #334155;
+            transition: 0.4s;
+            opacity: 0.5;
+        }
+
+        .label-box.active {
+            opacity: 1;
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.05);
+            transform: scale(1.02);
+        }
+
+        .class-name { font-weight: 500; }
+        .probability { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 700; 
+            color: var(--primary);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
 
-<div>Система розпізнавання (3 сек + 90%)</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
+    <header>
+        <img id="univ-logo" src="Лого універу обрізаний.png" alt="ЛНУ">
+        <h1>Система ідентифікації</h1>
+    </header>
 
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-
-<script type="text/javascript">
-    const URL = "./"; // Шлях до файлів у вашому репозиторії
-
-    let model, webcam, labelContainer, maxPredictions;
+    <div id="start-container">
+        <button type="button" id="start-btn" onclick="init()">Запустити камеру</button>
+    </div>
     
-    // Об'єкт для відстеження часу детекції кожного класу
-    let detectionTrackers = {};
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
 
-    async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
+    <script type="text/javascript">
+        const URL = "./"; 
+        let model, webcam, labelContainer, maxPredictions;
+        let detectionTrackers = {};
 
-        const flip = true;
-        webcam = new tmImage.Webcam(400, 400, flip);
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+        async function init() {
+            // ВИДАЛЯЄМО КНОПКУ ПОВНІСТЮ
+            const startBtn = document.getElementById('start-btn');
+            startBtn.parentNode.removeChild(startBtn);
 
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        
-        for (let i = 0; i < maxPredictions; i++) {
-            labelContainer.appendChild(document.createElement("div"));
-            
-            // Створюємо трекер для кожного класу (наприклад: Марко, Олена, Повітря)
-            detectionTrackers[i] = {
-                startTime: null,
-                isAnnounced: false
-            };
-        }
-    }
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
 
-    async function loop() {
-        webcam.update();
-        await predict();
-        window.requestAnimationFrame(loop);
-    }
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
 
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
-        const currentTime = Date.now();
+                const flip = true;
+                webcam = new tmImage.Webcam(400, 400, flip);
+                await webcam.setup();
+                await webcam.play();
+                window.requestAnimationFrame(loop);
 
-        for (let i = 0; i < maxPredictions; i++) {
-            const className = prediction[i].className;
-            const probability = prediction[i].probability;
-
-            // Оновлюємо текст на екрані
-            labelContainer.childNodes[i].innerHTML = `<span>${className}</span> <span>${(probability * 100).toFixed(0)}%</span>`;
-
-            // ЛОГІКА: більше 90% (0.90)
-            if (probability > 0.90) {
-                // Якщо детекція щойно почалася — фіксуємо час
-                if (!detectionTrackers[i].startTime) {
-                    detectionTrackers[i].startTime = currentTime;
-                } 
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
                 
-                // Перевіряємо, чи пройшло 3000 мс (3 секунди)
-                const duration = currentTime - detectionTrackers[i].startTime;
-                
-                if (duration > 3000 && !detectionTrackers[i].isAnnounced) {
-                    announceClass(className);
-                    detectionTrackers[i].isAnnounced = true; // Щоб не "кричало" щосекунди
+                for (let i = 0; i < maxPredictions; i++) {
+                    const labelBox = document.createElement("div");
+                    labelBox.className = "label-box";
+                    labelContainer.appendChild(labelBox);
+                    detectionTrackers[i] = { startTime: null, isAnnounced: false };
                 }
-            } else {
-                // Якщо впевненість впала нижче 90% — скидаємо таймер
-                detectionTrackers[i].startTime = null;
-                detectionTrackers[i].isAnnounced = false;
+            } catch (e) {
+                console.error("Помилка ініціалізації:", e);
+                alert("Не вдалося завантажити камеру або модель.");
             }
         }
-    }
 
-    // Функція голосового оголошення
-    function announceClass(name) {
-        // Пропускаємо оголошення, якщо це клас "Повітря" (опціонально)
-        if (name.toLowerCase() === "повітря") return;
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
 
-        const utterance = new SpeechSynthesisUtterance(name);
-        utterance.lang = 'uk-UA'; // Українська мова
-        window.speechSynthesis.speak(utterance);
-    }
-</script>
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            const currentTime = Date.now();
 
+            for (let i = 0; i < maxPredictions; i++) {
+                const className = prediction[i].className;
+                const probability = prediction[i].probability;
+                const labelBox = labelContainer.childNodes[i];
+
+                labelBox.innerHTML = `
+                    <span class="class-name">${className}</span>
+                    <span class="probability">${(probability * 100).toFixed(0)}%</span>
+                `;
+
+                if (probability > 0.90) {
+                    labelBox.classList.add('active');
+                    if (!detectionTrackers[i].startTime) detectionTrackers[i].startTime = currentTime;
+                    
+                    if (currentTime - detectionTrackers[i].startTime > 3000 && !detectionTrackers[i].isAnnounced) {
+                        announceClass(className);
+                        detectionTrackers[i].isAnnounced = true;
+                    }
+                } else {
+                    labelBox.classList.remove('active');
+                    detectionTrackers[i].startTime = null;
+                    detectionTrackers[i].isAnnounced = false;
+                }
+            }
+        }
+
+        function announceClass(name) {
+            if (name.toLowerCase().includes("повітря")) return;
+            const utterance = new SpeechSynthesisUtterance(`Впізнано: ${name}`);
+            utterance.lang = 'uk-UA';
+            utterance.rate = 0.9; // Трохи повільніша, чітка дикція
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
 </body>
 </html>
