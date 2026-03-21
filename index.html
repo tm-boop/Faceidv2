@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Recognition System - LUTSK</title>
+    <title>AI System - LUTSK</title>
     <style>
         :root {
             --primary: #38bdf8;
@@ -22,14 +22,41 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 0;
         }
+
+        /* Навігація */
+        nav {
+            width: 100%;
+            background: #1e293b;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 15px 0;
+            border-bottom: 1px solid #334155;
+        }
+
+        nav a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        nav a.active {
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        nav a:hover { color: white; }
 
         header {
             display: flex;
             align-items: center;
             gap: 15px;
-            margin-bottom: 30px;
+            margin: 30px 0;
         }
 
         #univ-logo {
@@ -43,7 +70,7 @@
             margin: 0;
             background: linear-gradient(90deg, #fff, var(--primary));
             -webkit-background-clip: text;
-            -webkit-fill-color: transparent;
+            -webkit-text-fill-color: transparent;
             text-transform: uppercase;
         }
 
@@ -68,13 +95,13 @@
             background: #000;
         }
 
-        /* Список імен під камерою */
         #label-container {
             margin-top: 25px;
             display: grid;
             gap: 10px;
             width: 100%;
             max-width: 400px;
+            padding: 0 20px;
         }
 
         .label-box {
@@ -94,7 +121,6 @@
             transform: scale(1.02);
         }
 
-        /* Окремий блок для Space внизу */
         #footer-space {
             margin-top: auto;
             padding: 20px;
@@ -111,19 +137,21 @@
             background: #1e293b;
             font-size: 0.9rem;
             color: #94a3b8;
-            border: 1px dashed #475569;
+            transition: 0.3s;
         }
 
-        .space-indicator.active {
-            color: var(--accent);
-            border-color: var(--accent);
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        .space-indicator.active { 
+            color: var(--accent); 
+            border: 1px dashed var(--accent); 
         }
-
-        .probability { font-weight: 700; color: var(--primary); }
     </style>
 </head>
 <body>
+
+    <nav>
+        <a href="index.html" class="active">Ідентифікація</a>
+        <a href="emotions.html">Аналіз емоцій</a>
+    </nav>
 
     <header>
         <img id="univ-logo" src="Лого універу обрізаний.png" alt="Logo">
@@ -133,11 +161,10 @@
     <button type="button" id="start-btn" onclick="init()">Запустити систему</button>
     
     <div id="webcam-container"></div>
-    
     <div id="label-container"></div>
 
     <div id="footer-space">
-        <div id="space-box" class="space-indicator">Очікування даних...</div>
+        <div id="space-box" class="space-indicator">Очікування SPACE...</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
@@ -149,13 +176,11 @@
         let detectionTrackers = {};
 
         async function init() {
-            const btn = document.getElementById('start-btn');
-            btn.style.display = 'none';
+            // Прибираємо кнопку старт
+            const startBtn = document.getElementById('start-btn');
+            if(startBtn) startBtn.parentNode.removeChild(startBtn);
 
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
-
-            model = await tmImage.load(modelURL, metadataURL);
+            model = await tmImage.load(URL + "model.json", URL + "metadata.json");
             maxPredictions = model.getTotalClasses();
 
             webcam = new tmImage.Webcam(400, 400, true);
@@ -168,8 +193,6 @@
             
             for (let i = 0; i < maxPredictions; i++) {
                 const className = model.getClassLabels()[i].toLowerCase();
-                
-                // Створюємо трекери
                 detectionTrackers[i] = { 
                     startTime: null, 
                     isAnnounced: false,
@@ -177,7 +200,7 @@
                     isAir: className.includes("повітря")
                 };
 
-                // Додаємо в основний список тільки якщо це НЕ Space і НЕ Повітря
+                // Додаємо в список лише імена
                 if (!detectionTrackers[i].isSpace && !detectionTrackers[i].isAir) {
                     const div = document.createElement("div");
                     div.className = "label-box";
@@ -202,41 +225,6 @@
                 const prob = prediction[i].probability;
                 const tracker = detectionTrackers[i];
 
-                // 1. Оновлення інтерфейсу
                 if (tracker.isSpace) {
                     const spaceBox = document.getElementById("space-box");
-                    spaceBox.innerHTML = `ТЕХНІЧНИЙ КЛАС [SPACE]: ${(prob * 100).toFixed(0)}%`;
-                    prob > 0.90 ? spaceBox.classList.add('active') : spaceBox.classList.remove('active');
-                } 
-                else if (!tracker.isAir) {
-                    const labelBox = document.getElementById("box-" + i);
-                    if (labelBox) {
-                        labelBox.innerHTML = `<span>${className}</span><span class="probability">${(prob * 100).toFixed(0)}%</span>`;
-                        prob > 0.90 ? labelBox.classList.add('active') : labelBox.classList.remove('active');
-                    }
-                }
-
-                // 2. Логіка озвучки (Тільки імена, ігноруємо Space та Повітря)
-                if (prob > 0.90) {
-                    if (!tracker.startTime) tracker.startTime = currentTime;
-                    if (currentTime - tracker.startTime > 3000 && !tracker.isAnnounced) {
-                        if (!tracker.isSpace && !tracker.isAir) {
-                            announceClass(className);
-                            tracker.isAnnounced = true;
-                        }
-                    }
-                } else {
-                    tracker.startTime = null;
-                    tracker.isAnnounced = false;
-                }
-            }
-        }
-
-        function announceClass(name) {
-            const utterance = new SpeechSynthesisUtterance(`indificated: ${name}`);
-            utterance.lang = 'uk-UA';
-            window.speechSynthesis.speak(utterance);
-        }
-    </script>
-</body>
-</html>
+                    spaceBox.innerHTML = `КЛАС [SPACE]: ${(prob * 100).toFixed(0)}%
