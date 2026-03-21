@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Emotion Detector - LUTSK</title>
+    <style>
+        :root {
+            --primary: #a855f7; /* Фіолетовий колір для емоцій */
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        #univ-logo { width: 60px; height: auto; }
+
+        h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+        }
+
+        #video-container {
+            position: relative;
+            border: 3px solid var(--primary);
+            border-radius: 20px;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #emotion-display {
+            margin-top: 20px;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+        }
+
+        .status-msg {
+            margin-top: 10px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .back-link {
+            margin-top: 30px;
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <img id="univ-logo" src="Лого універу обрізаний.png" alt="Lutsk Logo">
+        <h1>Аналіз Емоцій</h1>
+    </header>
+
+    <div id="video-container">
+        <video id="video" width="400" height="400" autoplay muted></video>
+    </div>
+
+    <div id="emotion-display">Завантаження нейромережі...</div>
+    <p class="status-msg">Подивіться в камеру, щоб ШІ зчитав вашу міміку</p>
+
+    <a href="index.html" class="back-link">← Повернутися до ідентифікації</a>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <script>
+        const video = document.getElementById('video');
+        const emotionDisplay = document.getElementById('emotion-display');
+
+        // Переклад емоцій на українську
+        const emotionTranslations = {
+            neutral: "Нейтральний ",
+            happy: "Щасливий ",
+            sad: "Сумний ",
+            angry: "Сердитий ",
+            fearful: "Наляканий ",
+            disgusted: "Огида ",
+            surprised: "Здивований "
+        };
+
+        // Завантаження моделей face-api
+        async function startSystem() {
+            const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+            
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+            ]);
+
+            navigator.mediaDevices.getUserMedia({ video: {} })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(err => console.error("Камера недоступна:", err));
+        }
+
+        video.addEventListener('play', () => {
+            const canvas = faceapi.createCanvasFromMedia(video);
+            document.getElementById('video-container').append(canvas);
+            const displaySize = { width: video.width, height: video.height };
+            faceapi.matchDimensions(canvas, displaySize);
+
+            setInterval(async () => {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceExpressions();
+                
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                
+                if (detections.length > 0) {
+                    // Отримуємо емоцію з найвищим відсотком
+                    const expressions = detections[0].expressions;
+                    const mainEmotion = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+                    
+                    emotionDisplay.innerText = emotionTranslations[mainEmotion] || mainEmotion;
+                } else {
+                    emotionDisplay.innerText = "Обличчя не знайдено";
+                }
+            }, 200);
+        });
+
+        startSystem();
+    </script>
+</body>
+</html>
