@@ -232,9 +232,19 @@
             }
         }
 
-        function announceClass(name) {
-            const utterance = new SpeechSynthesisUtterance(`indificated: ${name}`);
-            utterance.lang = 'uk-UA';
+       function announceClass(name) {
+            // Створюємо об'єкт мовлення
+            const utterance = new SpeechSynthesisUtterance(`Identified: ${name}`);
+            
+            // Встановлюємо англійську мову (США)
+            utterance.lang = 'en-US';
+            
+            // Налаштування швидкості (1.0 - нормальна)
+            utterance.rate = 0.9;
+            
+            // Налаштування тональності (1.0 - нормальна)
+            utterance.pitch = 1.0;
+
             window.speechSynthesis.speak(utterance);
         }
     </script>
