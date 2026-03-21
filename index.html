@@ -10,6 +10,7 @@
             --bg: #0f172a;
             --card: #1e293b;
             --text: #f8fafc;
+            --accent: #6366f1;
         }
 
         body {
@@ -21,32 +22,33 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 40px 20px;
+            padding: 20px;
         }
 
         header {
             display: flex;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 40px;
+            gap: 15px;
+            margin-bottom: 30px;
         }
 
         #univ-logo {
-            width: 80px;
+            width: 70px;
             height: auto;
-            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.3));
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3));
         }
 
         h1 {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             margin: 0;
             background: linear-gradient(90deg, #fff, var(--primary));
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-fill-color: transparent;
+            text-transform: uppercase;
         }
 
         #start-btn {
-            padding: 16px 40px;
+            padding: 15px 40px;
             font-size: 1.1rem;
             font-weight: 700;
             color: var(--bg);
@@ -55,66 +57,88 @@
             border-radius: 12px;
             cursor: pointer;
             transition: 0.3s;
-            box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.4);
-        }
-
-        #start-btn:hover {
-            transform: translateY(-2px);
-            background: #7dd3fc;
+            margin-bottom: 20px;
         }
 
         #webcam-container {
             border: 3px solid var(--card);
-            border-radius: 24px;
+            border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
             background: #000;
         }
 
+        /* Список імен під камерою */
         #label-container {
-            margin-top: 30px;
+            margin-top: 25px;
             display: grid;
-            gap: 12px;
+            gap: 10px;
             width: 100%;
             max-width: 400px;
         }
 
         .label-box {
             background: var(--card);
-            padding: 16px 20px;
-            border-radius: 16px;
+            padding: 12px 20px;
+            border-radius: 12px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid #334155;
-            transition: 0.4s;
-            opacity: 0.4;
+            transition: 0.3s;
         }
 
         .label-box.active {
-            opacity: 1;
             border-color: var(--primary);
-            background: rgba(56, 189, 248, 0.05);
+            background: rgba(56, 189, 248, 0.1);
             transform: scale(1.02);
         }
 
-        .class-name { font-weight: 500; }
-        .probability { color: var(--primary); font-weight: 700; }
+        /* Окремий блок для Space внизу */
+        #footer-space {
+            margin-top: auto;
+            padding: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid #334155;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
+        .space-indicator {
+            padding: 10px 25px;
+            border-radius: 30px;
+            background: #1e293b;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            border: 1px dashed #475569;
+        }
+
+        .space-indicator.active {
+            color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+        }
+
+        .probability { font-weight: 700; color: var(--primary); }
     </style>
 </head>
 <body>
 
     <header>
-        <img id="univ-logo" src="Лого універу обрізаний.png" alt="ЛНУ">
+        <img id="univ-logo" src="Лого універу обрізаний.png" alt="Logo">
         <h1>Система ідентифікації</h1>
     </header>
 
-    <div id="controls">
-        <button type="button" id="start-btn" onclick="init()">Запустити систему</button>
-    </div>
+    <button type="button" id="start-btn" onclick="init()">Запустити систему</button>
     
     <div id="webcam-container"></div>
+    
     <div id="label-container"></div>
+
+    <div id="footer-space">
+        <div id="space-box" class="space-indicator">Очікування даних...</div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
@@ -125,9 +149,8 @@
         let detectionTrackers = {};
 
         async function init() {
-            // Видаляємо кнопку
             const btn = document.getElementById('start-btn');
-            btn.parentNode.removeChild(btn);
+            btn.style.display = 'none';
 
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
@@ -146,17 +169,21 @@
             for (let i = 0; i < maxPredictions; i++) {
                 const className = model.getClassLabels()[i].toLowerCase();
                 
-                // 2. Клас повітря та спейс робимо прихованими (не додаємо в список)
-                if (className.includes("повітря") || className.includes("space")) {
-                    detectionTrackers[i] = { startTime: null, isAnnounced: false, hidden: true };
-                    continue; 
-                }
+                // Створюємо трекери
+                detectionTrackers[i] = { 
+                    startTime: null, 
+                    isAnnounced: false,
+                    isSpace: className.includes("space"),
+                    isAir: className.includes("повітря")
+                };
 
-                const labelBox = document.createElement("div");
-                labelBox.className = "label-box";
-                labelBox.id = "box-" + i;
-                labelContainer.appendChild(labelBox);
-                detectionTrackers[i] = { startTime: null, isAnnounced: false, hidden: false };
+                // Додаємо в основний список тільки якщо це НЕ Space і НЕ Повітря
+                if (!detectionTrackers[i].isSpace && !detectionTrackers[i].isAir) {
+                    const div = document.createElement("div");
+                    div.className = "label-box";
+                    div.id = "box-" + i;
+                    labelContainer.appendChild(div);
+                }
             }
         }
 
@@ -172,32 +199,28 @@
 
             for (let i = 0; i < maxPredictions; i++) {
                 const className = prediction[i].className;
-                const probability = prediction[i].probability;
+                const prob = prediction[i].probability;
                 const tracker = detectionTrackers[i];
 
-                // Оновлюємо тільки видимі класи
-                if (!tracker.hidden) {
+                // 1. Оновлення інтерфейсу
+                if (tracker.isSpace) {
+                    const spaceBox = document.getElementById("space-box");
+                    spaceBox.innerHTML = `ТЕХНІЧНИЙ КЛАС [SPACE]: ${(prob * 100).toFixed(0)}%`;
+                    prob > 0.90 ? spaceBox.classList.add('active') : spaceBox.classList.remove('active');
+                } 
+                else if (!tracker.isAir) {
                     const labelBox = document.getElementById("box-" + i);
-                    labelBox.innerHTML = `
-                        <span class="class-name">${className}</span>
-                        <span class="probability">${(probability * 100).toFixed(0)}%</span>
-                    `;
-
-                    if (probability > 0.90) {
-                        labelBox.classList.add('active');
-                    } else {
-                        labelBox.classList.remove('active');
+                    if (labelBox) {
+                        labelBox.innerHTML = `<span>${className}</span><span class="probability">${(prob * 100).toFixed(0)}%</span>`;
+                        prob > 0.90 ? labelBox.classList.add('active') : labelBox.classList.remove('active');
                     }
                 }
 
-                // Логіка озвучки (1. Прибрано спейс і повітря)
-                if (probability > 0.90) {
+                // 2. Логіка озвучки (Тільки імена, ігноруємо Space та Повітря)
+                if (prob > 0.90) {
                     if (!tracker.startTime) tracker.startTime = currentTime;
-                    
                     if (currentTime - tracker.startTime > 3000 && !tracker.isAnnounced) {
-                        // Озвучуємо ТІЛЬКИ якщо це не повітря і не спейс
-                        const lowerName = className.toLowerCase();
-                        if (!lowerName.includes("повітря") && !lowerName.includes("space")) {
+                        if (!tracker.isSpace && !tracker.isAir) {
                             announceClass(className);
                             tracker.isAnnounced = true;
                         }
